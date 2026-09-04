@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Ask Summarizer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" class="sparkle-svg">
+            <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Ask Summarizer</h1>
+          <span class="subtitle">1-Click YouTube Summaries</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Status Bar -->
+    <div class="status-card">
+      <div class="status-row">
+        <span class="status-label">YouTube Video</span>
+        <span id="status-page" class="badge">Checking...</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Ask AI Feature</span>
+        <span id="status-ask" class="badge">Checking...</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Video Playback</span>
+        <button id="btn-toggle-playback" class="playback-btn" type="button">
+          <span id="playback-icon">⏸</span>
+          <span id="playback-text">Pause Video</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Action Button -->
+    <button id="btn-quick-summarize" class="primary-btn" type="button">
+      <svg viewBox="0 0 24 24" class="btn-icon">
+        <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5z"/>
+      </svg>
+      <span>Summarize This Video</span>
+      <kbd class="shortcut-pill">Alt+S</kbd>
+    </button>
+
+    <!-- Preferences -->
+    <div class="section-title">Settings</div>
+
+    <div class="toggle-list">
+      <label class="toggle-item">
+        <div class="toggle-info">
+          <span class="toggle-title">Show on Video (Top Right)</span>
+          <span class="toggle-desc">Floating frosted pill button directly on the video</span>
+        </div>
+        <input type="checkbox" id="pref-showVideoOverlay" class="toggle-checkbox" checked>
+        <span class="toggle-slider"></span>
+      </label>
+
+      <label class="toggle-item">
+        <div class="toggle-info">
+          <span class="toggle-title">Show in Action Bar</span>
+          <span class="toggle-desc">Pill button next to Share / Like in action bar</span>
+        </div>
+        <input type="checkbox" id="pref-showButton" class="toggle-checkbox">
+        <span class="toggle-slider"></span>
+      </label>
+
+      <label class="toggle-item">
+        <div class="toggle-info">
+          <span class="toggle-title">Exit Theater Mode</span>
+          <span class="toggle-desc">Auto-toggle to default view so chat is beside video</span>
+        </div>
+        <input type="checkbox" id="pref-exitTheaterOnSummarize" class="toggle-checkbox" checked>
+        <span class="toggle-slider"></span>
+      </label>
+
+      <label class="toggle-item">
+        <div class="toggle-info">
+          <span class="toggle-title">Pause Video on Summarize</span>
+          <span class="toggle-desc">Auto-pause playback when opening summary</span>
+        </div>
+        <input type="checkbox" id="pref-pauseOnSummarize" class="toggle-checkbox">
+        <span class="toggle-slider"></span>
+      </label>
+
+      <label class="toggle-item">
+        <div class="toggle-info">
+          <span class="toggle-title">Auto-click on Native Ask</span>
+          <span class="toggle-desc">Automatically clicks "Summarize" when you click Ask</span>
+        </div>
+        <input type="checkbox" id="pref-autoClickOnAsk" class="toggle-checkbox" checked>
+        <span class="toggle-slider"></span>
+      </label>
+
+      <label class="toggle-item">
+        <div class="toggle-info">
+          <span class="toggle-title">Auto-summarize on Load</span>
+          <span class="toggle-desc">Automatically trigger summary when video loads</span>
+        </div>
+        <input type="checkbox" id="pref-autoSummarizeOnLoad" class="toggle-checkbox">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-note">Uses YouTube's native Gemini Ask modal. Zero API keys or account setup needed.</div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

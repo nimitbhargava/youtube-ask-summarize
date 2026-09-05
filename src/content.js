@@ -360,7 +360,7 @@
       const text = normalize(chipEl.textContent);
       const aria = normalize(chipEl.getAttribute('aria-label'));
       if (text.includes('summarize') || aria.includes('summarize')) {
-        return chipEl.querySelector('button, [role="button"], #chip') || chipEl;
+        return chipEl;
       }
     }
 
@@ -395,11 +395,71 @@
         aria.includes('summarize');
 
       if (isSummarize) {
-        return btn.querySelector('#chip, yt-formatted-string, span') || btn;
+        return btn;
+      }
+    }
+
+    // Third: Any element containing "summarize the video" or "summarize this video" (excluding header/close)
+    const allEls = modal.querySelectorAll('yt-formatted-string, span, div');
+    for (const el of allEls) {
+      if (!isVisible(el)) continue;
+      if (
+        el.closest('ytd-engagement-panel-title-header-renderer') ||
+        el.closest('#visibility-button') ||
+        el.closest('#dismiss-button') ||
+        el.closest('form, [class*="input"], [class*="footer"]')
+      ) {
+        continue;
+      }
+      const text = normalize(el.textContent);
+      if (text === 'summarize the video' || text === 'summarize this video' || text === 'summarize') {
+        const clickable = el.closest('button, [role="button"], yt-chip-cloud-chip-renderer, ytd-chip-cloud-chip-renderer') || el;
+        return clickable;
       }
     }
 
     return null;
+  }
+
+  /**
+   * Dispatches click events to both inner interactive element and outer chip container.
+   */
+  function clickChip(chipEl) {
+    if (!chipEl) return;
+    const inner = chipEl.querySelector('button, [role="button"], #chip, yt-formatted-string');
+    if (inner && inner !== chipEl) {
+      clickSingleElement(inner);
+    }
+    clickSingleElement(chipEl);
+  }
+
+  /**
+   * Extracts conversational text from the modal, excluding initial suggestion chips, header, and disclaimers.
+   */
+  function getModalConversationText(modal) {
+    if (!modal) return '';
+
+    // If bot response elements exist, use their text directly
+    const botMessages = modal.querySelectorAll(
+      'ytd-conversational-ai-response-renderer, [class*="response-container"], [class*="bot-message"], [class*="assistant-message"]'
+    );
+    if (botMessages.length > 0) {
+      let botText = '';
+      for (const m of botMessages) {
+        if (isVisible(m)) botText += ' ' + m.textContent;
+      }
+      return normalize(botText);
+    }
+
+    // Otherwise clone modal and remove non-conversation elements
+    const clone = modal.cloneNode(true);
+    const elementsToRemove = clone.querySelectorAll(
+      'yt-chip-cloud-chip-renderer, ytd-chip-cloud-chip-renderer, [class*="chip-cloud"], [class*="suggestion-chip"], [class*="prompt-chip"], ytd-engagement-panel-title-header-renderer, header, tp-yt-paper-spinner, tp-yt-paper-spinner-lite, [class*="disclaimer"], [class*="header"]'
+    );
+    for (const el of elementsToRemove) {
+      el.remove();
+    }
+    return normalize(clone.textContent);
   }
 
   /**
@@ -420,7 +480,9 @@
     const chatTurns = modal.querySelectorAll(
       'ytd-conversational-ai-turn-renderer, ytd-conversational-ai-message-renderer, [class*="chat-turn"], [class*="message-bubble"], [class*="user-turn"]'
     );
-    if (chatTurns.length > 0) return true;
+    for (const t of chatTurns) {
+      if (isVisible(t) && t.textContent.trim().length > 0) return true;
+    }
 
     // 3. If summary has already started streaming
     if (hasSummaryStarted(modal)) return true;
@@ -433,46 +495,57 @@
    */
   function hasSummaryStarted(modal) {
     if (!modal) return false;
-    const text = normalize(modal.textContent);
 
-    const summaryPhrases = [
-      'key takeaways',
-      'key highlights',
-      'keys to success',
-      'this video outlines',
-      'this video explores',
-      'this video argues',
-      'this video covers',
-      'this video discusses',
-      'this video is about',
-      'this video explains',
-      'heres a summary',
-      'here is a summary',
-      'summary of the video',
-      'summary:',
-      'main points',
-      'overview',
-      'takeaways',
-    ];
-
-    for (const phrase of summaryPhrases) {
-      if (text.includes(phrase)) return true;
-    }
-
-    // Check if there is an assistant response container with text
+    // 1. Check if there is an assistant response container with text
     const botMessages = modal.querySelectorAll(
       'ytd-conversational-ai-response-renderer, [class*="response-container"], [class*="bot-message"], [class*="assistant-message"]'
     );
     for (const m of botMessages) {
-      if (isVisible(m) && m.textContent.trim().length > 30) {
+      if (isVisible(m) && m.textContent.trim().length > 25) {
         return true;
       }
     }
 
-    // If modal text has substantial content beyond the initial static greetings
-    if (text.includes('summarize the video') && text.length > 280) {
-      // Ensure it's not just static text by checking for bullets or absence of loading spinner
-      if (text.includes('•') || text.includes('- ') || text.includes('1.') || !modal.querySelector('tp-yt-paper-spinner, [class*="spinner"], [class*="skeleton"]')) {
+    // 2. Check if multiple chat turns exist (turn 1 = user prompt, turn 2 = ai response)
+    const chatTurns = modal.querySelectorAll(
+      'ytd-conversational-ai-turn-renderer, [class*="chat-turn"], [class*="message-bubble"]'
+    );
+    if (chatTurns.length >= 2) {
+      const lastTurn = chatTurns[chatTurns.length - 1];
+      if (lastTurn.textContent.trim().length > 20) {
+        return true;
+      }
+    }
+
+    // 3. Check for specific summary phrases strictly in conversation text (never from chips)
+    const convText = getModalConversationText(modal);
+    if (convText && convText.length > 30) {
+      const summaryPhrases = [
+        'key takeaways',
+        'key highlights',
+        'keys to success',
+        'this video outlines',
+        'this video explores',
+        'this video argues',
+        'this video covers',
+        'this video discusses',
+        'this video is about',
+        'this video explains',
+        'this video breaks down',
+        'in this video',
+        'heres a summary',
+        'here is a summary',
+        'summary of the video',
+        'summary:',
+        'main points',
+      ];
+
+      for (const phrase of summaryPhrases) {
+        if (convText.includes(phrase)) return true;
+      }
+
+      // Check for bullet points or numbered lists in conversational text
+      if ((convText.includes('•') || convText.includes('- ') || convText.includes('1.')) && convText.length > 50) {
         return true;
       }
     }
@@ -582,12 +655,12 @@
     clickSingleElement(clickTarget);
 
     // Step 3: Wait for modal to open and animate in, then click chip
-    waitForModalAndClick();
+    waitForModalAndClick(false);
   }
 
   let activeModalInterval = null;
 
-  function waitForModalAndClick() {
+  function waitForModalAndClick(initialHasClicked = false) {
     // Prevent duplicate intervals
     if (activeModalInterval) {
       clearInterval(activeModalInterval);
@@ -595,57 +668,70 @@
     }
 
     const startTime = Date.now();
-    const timeoutMs = 15000;
-    let hasClickedChip = false;
+    const timeoutMs = 25000;
+    let hasClickedChip = initialHasClicked;
     let modalMountedTime = null;
+    let lastClickTime = initialHasClicked ? Date.now() : 0;
 
     activeModalInterval = setInterval(() => {
       const modal = findAskModal();
-      if (modal) {
-        if (!modalMountedTime) {
-          modalMountedTime = Date.now();
-        }
-
-        // Check if summary has started streaming or completed
-        if (hasSummaryStarted(modal)) {
+      if (!modal) {
+        if (Date.now() - startTime > timeoutMs) {
           clearInterval(activeModalInterval);
           activeModalInterval = null;
-          onSummarizeSuccess();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-          return;
+          resetSummarizeButtons();
+          isSummarizing = false;
         }
+        return;
+      }
 
-        // If the prompt is ALREADY submitted and currently loading/generating,
-        // DO NOT CLICK ANYTHING! Just wait for the summary to arrive!
-        if (isPromptSubmitted(modal)) {
-          return;
-        }
+      if (!modalMountedTime) {
+        modalMountedTime = Date.now();
+      }
 
-        const now = Date.now();
+      const now = Date.now();
 
-        // Wait 400ms after modal mounts for animation & hydration to settle
-        if (now - modalMountedTime > 400 && !hasClickedChip) {
+      // Phase 1: Not clicked yet -> search for and click the chip
+      if (!hasClickedChip) {
+        // Wait 300ms after modal mounts for animation & Polymer hydration
+        if (now - modalMountedTime >= 300) {
           const chip = findSummarizeChip(modal);
           if (chip) {
             hasClickedChip = true;
-            clickSingleElement(chip);
+            lastClickTime = now;
+            clickChip(chip);
             return;
           }
-        }
 
-        // If still not submitted after 2.5s, try finding chip again
-        if (now - modalMountedTime > 2500 && !hasClickedChip) {
-          const chip = findSummarizeChip(modal);
-          if (chip) {
+          // Fallback to chat input after 4s if chip still wasn't found
+          if (now - modalMountedTime >= 4000) {
             hasClickedChip = true;
-            clickSingleElement(chip);
+            lastClickTime = now;
+            fallbackInputSummarize(modal);
             return;
           }
         }
+        return;
+      }
 
-        // Fallback to chat input only after 5s if chip still wasn't found
-        if (now - modalMountedTime > 5000 && !hasClickedChip) {
-          hasClickedChip = true;
+      // Phase 2: Chip has been clicked -> wait for summary response
+      if (hasSummaryStarted(modal)) {
+        clearInterval(activeModalInterval);
+        activeModalInterval = null;
+        onSummarizeSuccess();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      // If chip was clicked but 3s later neither spinner nor response is present,
+      // retry clicking the chip once
+      if (now - lastClickTime >= 3000 && !isPromptSubmitted(modal)) {
+        const chip = findSummarizeChip(modal);
+        if (chip) {
+          lastClickTime = now;
+          clickChip(chip);
+        } else {
+          lastClickTime = now;
           fallbackInputSummarize(modal);
         }
       }
@@ -667,15 +753,18 @@
     }
 
     if (isPromptSubmitted(modal)) {
-      waitForModalAndClick();
+      waitForModalAndClick(true);
       return;
     }
 
     const chip = findSummarizeChip(modal);
     if (chip) {
-      clickSingleElement(chip);
+      clickChip(chip);
+      waitForModalAndClick(true);
+      return;
     }
-    waitForModalAndClick();
+
+    waitForModalAndClick(false);
   }
 
   function setButtonsLoading() {
